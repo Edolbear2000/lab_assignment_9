@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 
 // RecordType
 struct RecordType
@@ -6,18 +7,20 @@ struct RecordType
 	int		id;
 	char	name;
 	int		order; 
+	struct RecordType* next; // for chaining in the hash table
 };
 
-// Fill out this structure
+// HashTable
 struct HashType
 {
-
+	struct RecordType* head; // pointer to the head of the linked list at a particular index in the hash table
+	int count; // number of records at a particular index
 };
 
 // Compute the hash function
-int hash(int x)
+int hash(int x, int size)
 {
-
+	return x % size;
 }
 
 // parses input file to an integer array
@@ -34,7 +37,6 @@ int parseData(char* inputFileName, struct RecordType** ppData)
 	{
 		fscanf(inFile, "%d\n", &dataSz);
 		*ppData = (struct RecordType*) malloc(sizeof(struct RecordType) * dataSz);
-		// Implement parse data block
 		if (*ppData == NULL)
 		{
 			printf("Cannot allocate memory\n");
@@ -49,6 +51,7 @@ int parseData(char* inputFileName, struct RecordType** ppData)
 			pRecord->name = c;
 			fscanf(inFile, "%d ", &n);
 			pRecord->order = n;
+			pRecord->next = NULL; // initialize next pointer to NULL
 		}
 
 		fclose(inFile);
@@ -69,26 +72,72 @@ void printRecords(struct RecordType pData[], int dataSz)
 	printf("\n\n");
 }
 
-// display records in the hash structure
-// skip the indices which are free
-// the output will be in the format:
-// index x -> id, name, order -> id, name, order ....
-void displayRecordsInHash(struct HashType *pHashArray, int hashSz)
+// Insert into HashTable
+void insertIntoHashTable(struct HashType* hashTable, int hashSize, struct RecordType* record)
+{
+	int index = hash(record->id, hashSize);
+	record->next = hashTable[index].head;
+	hashTable[index].head = record;
+	hashTable[index].count++;
+}
+
+// Create the hash table
+struct HashType* createHashTable(int hashSize, struct RecordType* records, int recordSize)
 {
 	int i;
-
-	for (i=0;i<hashSz;++i)
+	struct HashType* hashTable = (struct HashType*) malloc(sizeof(struct HashType) * hashSize);
+	
+	for (i = 0; i < hashSize; i++)
 	{
-		// if index is occupied with any records, print all
+		hashTable[i].head = NULL;
+		hashTable[i].count = 0;
+	}
+
+	for (i = 0; i < recordSize; i++)
+	{
+		insertIntoHashTable(hashTable, hashSize, &records[i]);
+	}
+
+	return hashTable;
+}
+
+// display records in the hash structure
+void displayRecordsInHash(struct HashType* hashTable, int hashSize)
+{
+	int i;
+	struct RecordType* temp;
+
+	for (i = 0; i < hashSize; i++)
+	{
+		temp = hashTable[i].head;
+		printf("\nBucket %d :", i);
+		while (temp)
+		{
+			printf(" -> id: %d, name: %c, order: %d", temp->id, temp->name, temp->order);
+			temp = temp->next;
+		}
 	}
 }
 
 int main(void)
 {
-	struct RecordType *pRecords;
-	int recordSz = 0;
+	struct RecordType* records;
+	int recordSize = 0;
 
-	recordSz = parseData("input.txt", &pRecords);
-	printRecords(pRecords, recordSz);
-	// Your hash implementation
+	// Assuming hashSize is 10, it should be decided based on expected number of entries for efficient storage and lookup.
+	int hashSize = 10;
+	struct HashType* hashTable;
+
+	recordSize = parseData("input.txt", &records);
+	printRecords(records, recordSize);
+
+	hashTable = createHashTable(hashSize, records, recordSize);
+
+	displayRecordsInHash(hashTable, hashSize);
+
+	// cleanup
+	free(records);
+	free(hashTable);
+
+	return 0;
 }
